@@ -67,7 +67,7 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
     }
 
     @ReactMethod
-    public void requestPermissions(Promise promise){
+    public void requestPermissions(ReadableMap params, Promise promise){
         if(NotificationManagerCompat.from(getReactApplicationContext()).areNotificationsEnabled()){
             promise.resolve(true);
         } else {
