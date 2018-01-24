@@ -24,6 +24,8 @@ import com.google.firebase.messaging.RemoteMessage.Notification;
 
 import android.app.Application;
 import android.os.Bundle;
+import android.support.v4.app.NotificationManagerCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
 import android.content.Context;
@@ -61,21 +63,26 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
             promise.resolve(null);
             return;
         }
-        promise.resolve(parseIntent(getCurrentActivity().getIntent()));
+        promise.resolve(parseIntent(activity.getIntent()));
     }
 
     @ReactMethod
-    public void requestPermissions(ReadableMap params){
+    public void requestPermissions(Promise promise){
+        if(NotificationManagerCompat.from(getReactApplicationContext()).areNotificationsEnabled()){
+            promise.resolve(true);
+        } else {
+            promise.reject(null, "Notification disabled");
+        }
     }
 
     @ReactMethod
     public void getFCMToken(Promise promise) {
         try {
-             Log.d(TAG, "Firebase token: " + FirebaseInstanceId.getInstance().getToken());
-             promise.resolve(FirebaseInstanceId.getInstance().getToken());
+            Log.d(TAG, "Firebase token: " + FirebaseInstanceId.getInstance().getToken());
+            promise.resolve(FirebaseInstanceId.getInstance().getToken());
         } catch (Throwable e) {
-             e.printStackTrace();
-             promise.reject(null,e.getMessage());
+            e.printStackTrace();
+            promise.reject(null,e.getMessage());
         }
     }
 
@@ -104,11 +111,11 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
 
     @ReactMethod
     public void cancelLocalNotification(String notificationID) {
-      mFIRLocalMessagingHelper.cancelLocalNotification(notificationID);
+        mFIRLocalMessagingHelper.cancelLocalNotification(notificationID);
     }
     @ReactMethod
     public void cancelAllLocalNotifications() {
-      mFIRLocalMessagingHelper.cancelAllLocalNotifications();
+        mFIRLocalMessagingHelper.cancelAllLocalNotifications();
     }
 
     @ReactMethod
@@ -148,18 +155,18 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
 
     @ReactMethod
     public void getBadgeNumber(Promise promise) {
-       promise.resolve(mBadgeHelper.getBadgeCount());
+        promise.resolve(mBadgeHelper.getBadgeCount());
     }
 
     private void sendEvent(String eventName, Object params) {
         getReactApplicationContext()
-            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
-            .emit(eventName, params);
+        .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+        .emit(eventName, params);
     }
 
     private void registerTokenRefreshHandler() {
         IntentFilter intentFilter = new IntentFilter("com.evollu.react.fcm.FCMRefreshToken");
-        getReactApplicationContext().registerReceiver(new BroadcastReceiver() {
+        LocalBroadcastManager.getInstance(getReactApplicationContext()).registerReceiver(new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 if (getReactApplicationContext().hasActiveCatalystInstance()) {
@@ -174,7 +181,7 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
     public void send(String senderId, ReadableMap payload) throws Exception {
         FirebaseMessaging fm = FirebaseMessaging.getInstance();
         RemoteMessage.Builder message = new RemoteMessage.Builder(senderId + "@gcm.googleapis.com")
-            .setMessageId(UUID.randomUUID().toString());
+        .setMessageId(UUID.randomUUID().toString());
 
         ReadableMapKeySetIterator iterator = payload.keySetIterator();
         while (iterator.hasNextKey()) {
@@ -205,39 +212,39 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
     private void registerMessageHandler() {
         IntentFilter intentFilter = new IntentFilter("com.evollu.react.fcm.ReceiveNotification");
 
-        getReactApplicationContext().registerReceiver(new BroadcastReceiver() {
+        LocalBroadcastManager.getInstance(getReactApplicationContext()).registerReceiver(new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-            if (getReactApplicationContext().hasActiveCatalystInstance()) {
-                RemoteMessage message = intent.getParcelableExtra("data");
-                WritableMap params = Arguments.createMap();
-                WritableMap fcmData = Arguments.createMap();
+                if (getReactApplicationContext().hasActiveCatalystInstance()) {
+                    RemoteMessage message = intent.getParcelableExtra("data");
+                    WritableMap params = Arguments.createMap();
+                    WritableMap fcmData = Arguments.createMap();
 
-                if (message.getNotification() != null) {
-                    Notification notification = message.getNotification();
-                    fcmData.putString("title", notification.getTitle());
-                    fcmData.putString("body", notification.getBody());
-                    fcmData.putString("color", notification.getColor());
-                    fcmData.putString("icon", notification.getIcon());
-                    fcmData.putString("tag", notification.getTag());
-                    fcmData.putString("action", notification.getClickAction());
-                }
-                params.putMap("fcm", fcmData);
-                params.putString("collapse_key", message.getCollapseKey());
-                params.putString("from", message.getFrom());
-                params.putString("google.message_id", message.getMessageId());
-                params.putDouble("google.sent_time", message.getSentTime());
-
-                if(message.getData() != null){
-                    Map<String, String> data = message.getData();
-                    Set<String> keysIterator = data.keySet();
-                    for(String key: keysIterator){
-                        params.putString(key, data.get(key));
+                    if (message.getNotification() != null) {
+                        Notification notification = message.getNotification();
+                        fcmData.putString("title", notification.getTitle());
+                        fcmData.putString("body", notification.getBody());
+                        fcmData.putString("color", notification.getColor());
+                        fcmData.putString("icon", notification.getIcon());
+                        fcmData.putString("tag", notification.getTag());
+                        fcmData.putString("action", notification.getClickAction());
                     }
-                }
-                sendEvent("FCMNotificationReceived", params);
+                    params.putMap("fcm", fcmData);
+                    params.putString("collapse_key", message.getCollapseKey());
+                    params.putString("from", message.getFrom());
+                    params.putString("google.message_id", message.getMessageId());
+                    params.putDouble("google.sent_time", message.getSentTime());
 
-            }
+                    if(message.getData() != null){
+                        Map<String, String> data = message.getData();
+                        Set<String> keysIterator = data.keySet();
+                        for(String key: keysIterator){
+                            params.putString(key, data.get(key));
+                        }
+                    }
+                    sendEvent("FCMNotificationReceived", params);
+
+                }
             }
         }, intentFilter);
     }
@@ -245,7 +252,7 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
     private void registerLocalMessageHandler() {
         IntentFilter intentFilter = new IntentFilter("com.evollu.react.fcm.ReceiveLocalNotification");
 
-        getReactApplicationContext().registerReceiver(new BroadcastReceiver() {
+        LocalBroadcastManager.getInstance(getReactApplicationContext()).registerReceiver(new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 if (getReactApplicationContext().hasActiveCatalystInstance()) {
